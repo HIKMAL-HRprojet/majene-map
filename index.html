@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Peta Majene - Statistik Penduduk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background-color: #f0f0f0;
+      }
+
+      header {
+        background-color: #1e8449;
+        color: white;
+        padding: 1rem;
+        text-align: center;
+        font-size: 1.4rem;
+      }
+
+      nav {
+        background: #ecf0f1;
+        display: flex;
+        justify-content: center;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      nav ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+      }
+
+      nav ul li {
+        position: relative;
+      }
+
+      nav ul li a {
+        display: block;
+        padding: 1rem 1.5rem;
+        color: #1e8449;
+        text-decoration: none;
+        font-weight: bold;
+      }
+
+      nav ul li:hover {
+        background: #2ecc71;
+      }
+
+      nav ul li:hover > a {
+        color: white;
+      }
+
+      nav ul li ul {
+        display: none;
+        position: absolute;
+        background: #fff;
+        top: 100%;
+        left: 0;
+        min-width: 220px;
+        border: 1px solid #ccc;
+        z-index: 1000;
+      }
+
+      nav ul li:hover ul {
+        display: block;
+      }
+
+      nav ul li ul li a {
+        padding: 0.8rem 1.2rem;
+        color: #145a32;
+      }
+
+      nav ul li ul li:hover {
+        background: #2ecc71;
+      }
+
+      nav ul li ul li:hover a {
+        color: white;
+      }
+
+      #map {
+        height: 70vh;
+      }
+
+      .info-box {
+        background: white;
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .info-box h3 {
+        margin-top: 0;
+        color: #1e8449;
+      }
+    </style>
+  </head>
+  <body>
+    <header>Peta Persebaran Penduduk Kabupaten Majene</header>
+
+    <nav>
+      <ul>
+        <li>
+          <a href="#">Penduduk Kab. Majene ▼</a>
+          <ul>
+            <li>
+              <a href="#" onclick="tampilkanStatistikKabupaten()"
+                >Tampilkan Statistik</a
+              >
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="#">Pilih Kecamatan ▼</a>
+          <ul id="dropdown-kecamatan">
+            <!-- Diisi lewat JavaScript -->
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div id="map"></div>
+
+    <div class="info-box" id="info-box">
+      <h3>Informasi Penduduk</h3>
+      <p>Pilih menu di atas untuk menampilkan data penduduk.</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      const map = L.map("map").setView([-2.6, 119.3], 9);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "Peta oleh OpenStreetMap & Leaflet",
+      }).addTo(map);
+
+      let geoLayer;
+      let geoData;
+
+      // Daftar warna untuk tiap kecamatan
+      const daftarWarna = [
+        "#1abc9c",
+        "#2ecc71",
+        "#3498db",
+        "#9b59b6",
+        "#f1c40f",
+        "#e67e22",
+        "#e74c3c",
+        "#16a085",
+        "#2980b9",
+        "#8e44ad",
+        "#27ae60",
+        "#d35400",
+        "#c0392b",
+      ];
+      const warnaKecamatan = {};
+
+      function getWarnaKecamatan(nama) {
+        if (!warnaKecamatan[nama]) {
+          const index = Object.keys(warnaKecamatan).length % daftarWarna.length;
+          warnaKecamatan[nama] = daftarWarna[index];
+        }
+        return warnaKecamatan[nama];
+      }
+
+      function tampilkanStatistik(kecamatan = null) {
+        let laki = 0,
+          perempuan = 0;
+        geoData.features.forEach((f) => {
+          const props = f.properties;
+          if (!kecamatan || props.kecamatan === kecamatan) {
+            laki += Number(props.laki_laki || 0);
+            perempuan += Number(props.perempuan || 0);
+          }
+        });
+        const total = laki + perempuan;
+
+        const lokasi = kecamatan
+          ? `Kecamatan <strong>${kecamatan}</strong>`
+          : "Kabupaten Majene";
+
+        document.getElementById("info-box").innerHTML = `
+      <h3>Data Penduduk ${lokasi}</h3>
+      <p><strong>Laki-laki:</strong> ${laki.toLocaleString()}</p>
+      <p><strong>Perempuan:</strong> ${perempuan.toLocaleString()}</p>
+      <p><strong>Total:</strong> ${total.toLocaleString()}</p>
+    `;
+      }
+
+      function tampilkanStatistikKabupaten() {
+        tampilkanStatistik();
+      }
+
+      fetch("majene_penduduk.geojson")
+        .then((res) => res.json())
+        .then((data) => {
+          geoData = data;
+
+          geoLayer = L.geoJSON(data, {
+            style: function (feature) {
+              const nama = feature.properties.kecamatan;
+              return {
+                color: getWarnaKecamatan(nama),
+                weight: 2,
+                fillOpacity: 0.5,
+              };
+            },
+            onEachFeature: (feature, layer) => {
+              const props = feature.properties;
+              if (props.kecamatan) {
+                const total =
+                  Number(props.laki_laki || 0) + Number(props.perempuan || 0);
+                layer.bindPopup(`
+              <strong>${props.kecamatan}</strong><br>
+              Laki-laki: ${props.laki_laki}<br>
+              Perempuan: ${props.perempuan}<br>
+              Total: ${total}
+            `);
+              }
+            },
+          }).addTo(map);
+
+          const dropdown = document.getElementById("dropdown-kecamatan");
+          const kecamatanList = [
+            ...new Set(data.features.map((f) => f.properties.kecamatan)),
+          ];
+
+          kecamatanList.forEach((kec) => {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = "#";
+            a.textContent = kec;
+            a.onclick = () => {
+              geoLayer.eachLayer((layer) => {
+                if (layer.feature.properties.kecamatan === kec) {
+                  map.fitBounds(layer.getBounds());
+                  layer.openPopup();
+                }
+              });
+              tampilkanStatistik(kec);
+            };
+            li.appendChild(a);
+            dropdown.appendChild(li);
+          });
+        });
+    </script>
+  </body>
+</html>
